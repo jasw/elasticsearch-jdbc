@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'org.xbib.elasticsearch.importer'
-version = '2.3.4.1'
+version = '2.3.4.1-search-guard-0.1'
 
 println "Host: " + java.net.InetAddress.getLocalHost()
 println "Gradle: " + gradle.gradleVersion + " JVM: " + org.gradle.internal.jvm.Jvm.current() + " Groovy: " + GroovySystem.getVersion()
@@ -22,7 +22,7 @@ ext {
     scmDeveloperConnection = 'scm:git:git://github.com/' + user + '/' + name + '.git'
     versions = [
       'elasticsearch' : '2.3.4',
-      'elasticsearch-helper' : '2.3.4.0',
+      'elasticsearch-helper' : '2.3.4.0-search-guard-0.1',
       'log4j': '2.5',
       'wagon' : '2.10',
       'jsr166e': '1.1.0',
@@ -81,6 +81,7 @@ configurations {
 }
 
 dependencies {
+    compile 'com.floragunn:search-guard-ssl:2.3.5.16'
     compile 'org.elasticsearch:elasticsearch:' + versions.elasticsearch
     compile 'org.xbib.elasticsearch.plugin:elasticsearch-helper:' + versions.'elasticsearch-helper'
     compile 'org.apache.logging.log4j:log4j-slf4j-impl:' + versions.log4j

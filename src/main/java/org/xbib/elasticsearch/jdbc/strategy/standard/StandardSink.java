@@ -15,6 +15,7 @@
  */
 package org.xbib.elasticsearch.jdbc.strategy.standard;
 
+import com.floragunn.searchguard.ssl.util.SSLConfigConstants;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.action.admin.indices.alias.get.GetAliasesAction;
@@ -23,6 +24,7 @@ import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.Requests;
+import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.ByteSizeValue;
@@ -36,6 +38,8 @@ import org.joda.time.format.DateTimeFormat;
 import org.xbib.elasticsearch.common.metrics.SinkMetric;
 import org.xbib.elasticsearch.common.util.ControlKeys;
 import org.xbib.elasticsearch.common.util.IndexableObject;
+import org.xbib.elasticsearch.helper.client.BulkTransportClient;
+import org.xbib.elasticsearch.helper.client.BulkTransportSearchGuardClient;
 import org.xbib.elasticsearch.helper.client.ClientAPI;
 import org.xbib.elasticsearch.helper.client.ClientBuilder;
 import org.xbib.elasticsearch.jdbc.strategy.Sink;
@@ -325,6 +329,41 @@ public class StandardSink<C extends StandardContext> implements Sink<C> {
                 .put("client.transport.ignore_cluster_name", false) // ignore cluster name setting
                 .put("client.transport.ping_timeout", settings.getAsTime("elasticsearch.timeout", TimeValue.timeValueSeconds(5))) //  ping timeout
                 .put("client.transport.nodes_sampler_interval", settings.getAsTime("elasticsearch.timeout", TimeValue.timeValueSeconds(5))); // for sniff sampling
+
+        logger.info("createClient, settings: " + settings);
+        logger.info("settings.get(\"elasticsearch.searchguard.ssl.transport.enabled\"): " + settings.get("elasticsearch.searchguard.ssl.transport.enabled"));
+        // optional search guard support
+        if (settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENABLED) != null) {
+            String ks = settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH);
+            String ts = settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH);
+            String kspass = settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD);
+            String tspass = settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD);
+            boolean nhnv = Boolean.parseBoolean(settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION, "false"));
+            boolean nrhn = Boolean.parseBoolean(settings.get("elasticsearch." + SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION_RESOLVE_HOST_NAME, "false"));;
+            String kst = null;
+            String tst = null;
+
+            String[] enabledProtocols = new String[0];
+            String[] enabledCiphers = new String[0];
+
+            logger.info(String.format("ks: %s, ts: %s, kspass: %s, tspass: %s", ks, ts, kspass, tspass) );
+
+            settingsBuilder
+                    .put("path.home",".")
+//                  .put("path.conf", ".")
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_FILEPATH,ks)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_FILEPATH, ts)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_PASSWORD, kspass)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_PASSWORD, tspass)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION, nhnv)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENFORCE_HOSTNAME_VERIFICATION_RESOLVE_HOST_NAME, nrhn)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENABLED, true)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_KEYSTORE_TYPE, kst==null?(ks.endsWith(".jks")?"JKS":"PKCS12"):kst)
+                    .put(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_TRUSTSTORE_TYPE, tst==null?(ts.endsWith(".jks")?"JKS":"PKCS12"):tst)
+                    .putArray(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENABLED_CIPHERS, enabledCiphers)
+                    .putArray(SSLConfigConstants.SEARCHGUARD_SSL_TRANSPORT_ENABLED_PROTOCOLS, enabledProtocols);
+
+        }
         // optional found.no transport plugin
         if (settings.get("transport.type") != null) {
             settingsBuilder.put("transport.type", settings.get("transport.type"));
